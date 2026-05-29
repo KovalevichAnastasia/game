@@ -1,6 +1,7 @@
 import pygame
 
 class GameController:
+    """Обрабатывает ввод пользователя (Controller в MVC)"""
     def __init__(self, game_state):
         self.game_state = game_state
 
