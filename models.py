@@ -42,17 +42,13 @@ class BallModel(GameObject):
     def update(self, wind=0.0):
         if not self.active:
             return
-
         self.move(self.speed_x + wind, self.speed_y)
-
-        # Ограничение по краям экрана, чтобы при ветре не улетал
         if self.x - self.radius <= 0:
             self.x = self.radius
             self.speed_x = abs(self.speed_x)
         elif self.x + self.radius >= WIDTH:
             self.x = WIDTH - self.radius
             self.speed_x = -abs(self.speed_x)
-            
         if self.y - self.radius <= 0:
             self.speed_y = -self.speed_y
 
@@ -60,7 +56,7 @@ class BallModel(GameObject):
         self.x = WIDTH // 2
         self.y = HEIGHT // 2
         self.speed_y = -BALL_SPEED_Y
-        self.speed_x = 0 # Спавнится посередине и летит вверх
+        self.speed_x = 0
 
 class AnimalModel(GameObject):
     def __init__(self, x, y, speed, is_golden=False):
@@ -121,7 +117,8 @@ class BirdModel(GameObject):
         self.shoot_timer = random.randint(60, 150)
 
     def update(self, wind=0.0):
-        if not self.active: return
+        if not self.active:
+            return
         self.move(self.speed_x + wind, 0)
         self.shoot_timer -= 1
         if self.x < -BIRD_WIDTH * 2 or self.x > WIDTH + BIRD_WIDTH * 2:
@@ -144,13 +141,17 @@ class HawkBossModel(GameObject):
         self.active = True
         self.speed_x = HAWK_SPEED * random.choice([-1, 1])
         self.shoot_timer = 60
+        self.hit_cooldown = 0
 
     def update(self, wind=0.0):
-        if not self.active: return
+        if not self.active:
+            return
         self.move(self.speed_x, 0)
         if self.x <= 0 or self.x + self.width >= WIDTH:
             self.speed_x = -self.speed_x
         self.shoot_timer -= 1
+        if self.hit_cooldown > 0:
+            self.hit_cooldown -= 1
 
 class GameState:
     def __init__(self):
@@ -163,18 +164,15 @@ class GameState:
         self.bird_projectiles = []
         self.hawk_boss = None
         self.hawk_stones = []
-        
         self.level = 1
         self.combo_timer = 0
         self.wind_speed = 0.0
         self.wind_timer = 0
         self.wind_cooldown = 0
         self.bird_spawn_timer = random.randint(300, 600)
-        
-        self.state = "MENU" # MENU, PLAYING, GAME_OVER, WIN
+        self.state = "MENU"
         self.high_score = self.load_high_score()
         self.last_score = self.load_last_score()
-        
         self.load_level(1)
 
     def load_level(self, level):
@@ -185,20 +183,20 @@ class GameState:
         self.bird_projectiles = []
         self.hawk_boss = None
         self.hawk_stones = []
-        
+
         if self.level >= 5:
             if len(self.balls) < 2:
                 self.balls = [BallModel(), BallModel()]
         else:
             self.balls = [BallModel()]
-            
+
         for b in self.balls:
             b.reset()
-            
+
         self.combo_timer = 0
         self.wind_speed = 0.0
         self.wind_timer = 0
-        
+
         if level == 1:
             self.wind_cooldown = -1
             self.clouds = []
@@ -207,25 +205,28 @@ class GameState:
             self.clouds = [CloudModel() for _ in range(2)]
         elif level == 3:
             self.wind_cooldown = -1
-            self.clouds = []  # На 3 уровне нет тучек
+            self.clouds = []
+        elif level == 4:
+            self.wind_cooldown = -1
+            self.hawk_boss = HawkBossModel()
+            self.clouds = []
+        elif level == 7:
+            self.wind_cooldown = -1
+            self.hawk_boss = HawkBossModel()
+            self.hawk_boss.hp = 12
+            self.clouds = []
         else:
             self.wind_cooldown = -1
             self.clouds = [CloudModel() for _ in range(min(2 + level, 5))]
 
-        if self.level == 3:
-            # Обычные зверьки рядами + птицы
+        if level == 3:
             speed = 4.5
             for row in range(3):
                 for col in range(8):
                     is_golden = random.random() < 0.1
                     self.animals.append(AnimalModel(100 + col * 80, 150 + row * 60, speed, is_golden))
             self.bird_spawn_timer = random.randint(60, 150)
-        elif self.level == 4:
-            # Уровень с боссом
-            self.hawk_boss = HawkBossModel()
-            self.clouds = []  # Чтобы не мешали боссу
-        else:
-            # Обычные уровни (1, 2, 5+)
+        elif level not in (4, 7):
             speed = 3.0 + (level - 1) * 1.5
             for row in range(3):
                 for col in range(8):
@@ -263,7 +264,7 @@ class GameState:
 
     def check_collisions(self):
         p = self.player
-        
+
         active_balls = [b for b in self.balls if b.active]
         if not active_balls:
             p.lives -= 1
@@ -275,23 +276,21 @@ class GameState:
                 for b in self.balls:
                     b.active = True
                     b.reset()
-        
+
         for b in self.balls:
-            if not b.active: continue
-            
-            # Столкновение шара с игроком
+            if not b.active:
+                continue
+
             if b.y + b.radius >= p.y and b.y - b.radius <= p.y + p.height:
                 if p.x <= b.x <= p.x + p.width:
                     b.y = p.y - b.radius
                     b.speed_y = -abs(b.speed_y)
                     hit_pos = (b.x - p.x) / p.width
                     b.speed_x = (hit_pos - 0.5) * 10
-            
-            # Шар падает вниз
+
             if b.y >= HEIGHT:
                 b.active = False
-            
-            # Столкновение с птицами
+
             for bird in self.birds:
                 if bird.active:
                     dist = math.hypot(b.x - (bird.x + bird.width//2), b.y - (bird.y + bird.height//2))
@@ -301,19 +300,19 @@ class GameState:
                         p.score += 30
                         if hasattr(self, 'birds_to_defeat') and self.birds_to_defeat > 0:
                             self.birds_to_defeat -= 1
-                        
-            # Столкновение с боссом
+
             if self.hawk_boss and self.hawk_boss.active:
                 hb = self.hawk_boss
                 dist = math.hypot(b.x - (hb.x + hb.width//2), b.y - (hb.y + hb.height//2))
                 if dist <= b.radius + max(hb.width, hb.height)//2:
-                    hb.hp -= 1
                     b.speed_y = -b.speed_y
-                    if hb.hp <= 0:
-                        hb.active = False
-                        p.score += 500
+                    if hb.hit_cooldown <= 0:
+                        hb.hp -= 1
+                        hb.hit_cooldown = 30
+                        if hb.hp <= 0:
+                            hb.active = False
+                            p.score += 500
 
-        # Молнии от туч
         for cloud in self.clouds:
             if cloud.shoot_timer <= 0:
                 self.lightnings.append(LightningModel(cloud.x + cloud.width // 2, cloud.y + cloud.height))
@@ -329,10 +328,9 @@ class GameState:
                         self.save_game_results()
             if l.y > HEIGHT:
                 l.active = False
-        
+
         self.lightnings = [l for l in self.lightnings if l.active]
 
-        # Снаряды птиц
         for proj in self.bird_projectiles:
             if proj.active and proj.y + proj.height >= p.y and proj.y <= p.y + p.height:
                 if p.x <= proj.x <= p.x + p.width:
@@ -344,8 +342,7 @@ class GameState:
             if proj.y > HEIGHT:
                 proj.active = False
         self.bird_projectiles = [p for p in self.bird_projectiles if p.active]
-        
-        # Камни босса
+
         for st in self.hawk_stones:
             if st.active and st.y + st.height >= p.y and st.y <= p.y + p.height:
                 if p.x <= st.x <= p.x + p.width:
@@ -360,7 +357,7 @@ class GameState:
 
         level_complete = False
 
-        if self.level == 4:
+        if self.level in (4, 7):
             if self.hawk_boss and not self.hawk_boss.active:
                 level_complete = True
         else:
@@ -368,7 +365,6 @@ class GameState:
             for a in self.animals:
                 if not a.caught and not a.lost:
                     all_caught_or_lost = False
-                    
                     if not a.falling:
                         for b in self.balls:
                             if b.active:
@@ -384,7 +380,6 @@ class GameState:
                                     p.lives += 1
                                 else:
                                     p.score += 20
-                                    
                                 p.combo_count += 1
                                 if p.combo_count >= 3:
                                     p.score += 50
@@ -400,63 +395,63 @@ class GameState:
             self.load_level(self.level + 1)
 
     def update(self):
-        if self.state == "PLAYING":
-            if self.combo_timer > 0:
-                self.combo_timer -= 1
-                
-            if self.wind_timer > 0:
-                self.wind_timer -= 1
-                if self.wind_timer <= 0:
-                    self.wind_speed = 0.0
-                    if self.level == 2:
-                        self.wind_cooldown = 1200
-            else:
-                if self.wind_cooldown > 0:
-                    self.wind_cooldown -= 1
-                elif self.wind_cooldown == 0 and self.level == 2:
-                    self.wind_speed = random.choice([-2.0, 2.0]) * random.uniform(0.5, 1.5)
-                    self.wind_timer = random.randint(120, 240)
-            
-            for b in self.balls:
-                b.update(self.wind_speed)
-                
-            for cloud in self.clouds:
-                cloud.update(self.wind_speed)
-            for l in self.lightnings:
-                l.update(self.wind_speed)
-            for a in self.animals:
-                a.update(self.wind_speed)
-                
-            if self.level == 3:
-                # Птицы летают на 3 уровне вместе с капибарами
-                self.bird_spawn_timer -= 1
-                if self.bird_spawn_timer <= 0:
-                    self.birds.append(BirdModel())
-                    self.bird_spawn_timer = random.randint(80, 160)
-            elif self.level not in (1, 2, 4):
-                # На 1 и 2 уровнях нет птиц, на 4 - только босс. На 5+ редкие птицы.
-                self.bird_spawn_timer -= 1
-                if self.bird_spawn_timer <= 0:
-                    self.birds.append(BirdModel())
-                    self.bird_spawn_timer = random.randint(400, 800)
-            
-            for bird in self.birds:
-                bird.update(self.wind_speed)
-                if bird.active and bird.shoot_timer <= 0:
-                    self.bird_projectiles.append(BirdProjectileModel(bird.x + bird.width//2, bird.y + bird.height))
-                    bird.shoot_timer = random.randint(60, 150)
-            self.birds = [b for b in self.birds if b.active]
-            
-            for bp in self.bird_projectiles:
-                bp.update(self.wind_speed)
-                
-            if self.hawk_boss and self.hawk_boss.active:
-                self.hawk_boss.update(self.wind_speed)
-                if self.hawk_boss.shoot_timer <= 0:
-                    self.hawk_stones.append(HawkStoneModel(self.hawk_boss.x + self.hawk_boss.width//2, self.hawk_boss.y + self.hawk_boss.height))
-                    self.hawk_boss.shoot_timer = random.randint(40, 90)
-                    
-            for st in self.hawk_stones:
-                st.update(self.wind_speed)
+        if self.state != "PLAYING":
+            return
 
-            self.check_collisions()
+        if self.combo_timer > 0:
+            self.combo_timer -= 1
+
+        if self.wind_timer > 0:
+            self.wind_timer -= 1
+            if self.wind_timer <= 0:
+                self.wind_speed = 0.0
+                if self.level == 2:
+                    self.wind_cooldown = 1200
+        else:
+            if self.wind_cooldown > 0:
+                self.wind_cooldown -= 1
+            elif self.wind_cooldown == 0 and self.level == 2:
+                self.wind_speed = random.choice([-2.0, 2.0]) * random.uniform(0.5, 1.5)
+                self.wind_timer = random.randint(120, 240)
+
+        for b in self.balls:
+            b.update(self.wind_speed)
+
+        for cloud in self.clouds:
+            cloud.update(self.wind_speed)
+        for l in self.lightnings:
+            l.update(self.wind_speed)
+        for a in self.animals:
+            a.update(self.wind_speed)
+
+        if self.level == 3:
+            self.bird_spawn_timer -= 1
+            if self.bird_spawn_timer <= 0:
+                self.birds.append(BirdModel())
+                self.bird_spawn_timer = random.randint(80, 160)
+        elif self.level not in (1, 2, 4, 7):
+            self.bird_spawn_timer -= 1
+            if self.bird_spawn_timer <= 0:
+                self.birds.append(BirdModel())
+                self.bird_spawn_timer = random.randint(400, 800)
+
+        for bird in self.birds:
+            bird.update(self.wind_speed)
+            if bird.active and bird.shoot_timer <= 0:
+                self.bird_projectiles.append(BirdProjectileModel(bird.x + bird.width//2, bird.y + bird.height))
+                bird.shoot_timer = random.randint(60, 150)
+        self.birds = [b for b in self.birds if b.active]
+
+        for bp in self.bird_projectiles:
+            bp.update(self.wind_speed)
+
+        if self.hawk_boss and self.hawk_boss.active:
+            self.hawk_boss.update(self.wind_speed)
+            if self.hawk_boss.shoot_timer <= 0:
+                self.hawk_stones.append(HawkStoneModel(self.hawk_boss.x + self.hawk_boss.width//2, self.hawk_boss.y + self.hawk_boss.height))
+                self.hawk_boss.shoot_timer = random.randint(40, 90)
+
+        for st in self.hawk_stones:
+            st.update(self.wind_speed)
+
+        self.check_collisions()
