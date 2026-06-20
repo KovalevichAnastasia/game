@@ -1,10 +1,19 @@
+"""
+main.py — Точка входа в игру «Пушистый переполох».
+
+Инициализирует pygame, создаёт экземпляры Model, View и Controller,
+запускает основной игровой цикл и корректно завершает приложение.
+"""
+
 import pygame
 from constants import WIDTH, HEIGHT, FPS
 from models import GameState
 from views import GameView
 from controllers import GameController
 
-def main():
+
+def main() -> None:
+    """Инициализировать игру и запустить основной цикл."""
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption("Пушистый переполох")
@@ -30,6 +39,7 @@ def main():
         clock.tick(FPS)
 
     pygame.quit()
+
 
 if __name__ == "__main__":
     main()
