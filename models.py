@@ -1,10 +1,3 @@
-"""
-models.py — Игровые модели и бизнес-логика.
-
-Содержит классы сущностей, менеджеры подсистем (очки, уровни, коллизии)
-и главный класс GameState, который их координирует.
-"""
-
 import random
 import math
 from constants import (
@@ -22,13 +15,7 @@ from constants import (
     HAWK_STONE_RADIUS, HAWK_STONE_SPEED,
 )
 
-
-# =============================================================================
-# Базовые классы сущностей
-# =============================================================================
-
 class GameObject:
-    """Базовый класс для всех игровых объектов с позицией и размером."""
 
     def __init__(self, x: float, y: float, width: int, height: int):
         self.x = x
@@ -37,13 +24,11 @@ class GameObject:
         self.height = height
 
     def move(self, dx: float, dy: float) -> None:
-        """Переместить объект на (dx, dy)."""
+
         self.x += dx
         self.y += dy
 
-
 class PlayerModel(GameObject):
-    """Управляемая игроком платформа."""
 
     def __init__(self):
         super().__init__(WIDTH // 2 - PLAYER_WIDTH // 2, HEIGHT - 40,
@@ -54,16 +39,14 @@ class PlayerModel(GameObject):
         self.combo_count = 0
 
     def move_left(self) -> None:
-        """Переместить влево, не выходя за границу экрана."""
+
         self.x = max(0, self.x - self.speed)
 
     def move_right(self) -> None:
-        """Переместить вправо, не выходя за границу экрана."""
+
         self.x = min(WIDTH - self.width, self.x + self.speed)
 
-
 class BallModel(GameObject):
-    """Прыгающий мяч, которым игрок взаимодействует с объектами."""
 
     def __init__(self):
         super().__init__(WIDTH // 2, HEIGHT // 2, BALL_RADIUS * 2, BALL_RADIUS * 2)
@@ -73,7 +56,7 @@ class BallModel(GameObject):
         self.active = True
 
     def update(self, wind: float = 0.0) -> None:
-        """Обновить позицию мяча с учётом стен и ветра."""
+
         if not self.active:
             return
         self.move(self.speed_x + wind, self.speed_y)
@@ -87,15 +70,13 @@ class BallModel(GameObject):
             self.speed_y = -self.speed_y
 
     def reset(self) -> None:
-        """Сбросить мяч в центр экрана."""
+
         self.x = WIDTH // 2
         self.y = HEIGHT // 2
         self.speed_y = -BALL_SPEED_Y
         self.speed_x = 0
 
-
 class AnimalModel(GameObject):
-    """Зверёк, которого игрок должен поймать платформой."""
 
     def __init__(self, x: float, y: float, speed: float, is_golden: bool = False):
         super().__init__(x, y, ANIMAL_RADIUS * 2, ANIMAL_RADIUS * 2)
@@ -107,13 +88,11 @@ class AnimalModel(GameObject):
         self.is_golden = is_golden
 
     def update(self, wind: float = 0.0) -> None:
-        """Падать вниз с учётом ветра."""
+
         if self.falling:
             self.move(wind, self.speed_y)
 
-
 class CloudModel(GameObject):
-    """Облако, движущееся горизонтально и периодически стреляющее молниями."""
 
     def __init__(self):
         x = random.randint(0, WIDTH - CLOUD_WIDTH)
@@ -123,15 +102,13 @@ class CloudModel(GameObject):
         self.shoot_timer = random.randint(100, 300)
 
     def update(self, wind: float = 0.0) -> None:
-        """Двигаться и отсчитывать таймер выстрела."""
+
         self.move(self.speed + wind, 0)
         if self.x <= 0 or self.x + self.width >= WIDTH:
             self.speed = -self.speed
         self.shoot_timer -= 1
 
-
 class LightningModel(GameObject):
-    """Молния, выпущенная облаком вниз."""
 
     def __init__(self, x: float, y: float):
         super().__init__(x, y, LIGHTNING_WIDTH, LIGHTNING_HEIGHT)
@@ -139,13 +116,11 @@ class LightningModel(GameObject):
         self.active = True
 
     def update(self, wind: float = 0.0) -> None:
-        """Двигаться вниз."""
+
         if self.active:
             self.move(wind, self.speed)
 
-
 class BirdProjectileModel(GameObject):
-    """Камень, сброшенный птицей-врагом."""
 
     def __init__(self, x: float, y: float):
         super().__init__(x, y, BIRD_PROJECTILE_RADIUS * 2, BIRD_PROJECTILE_RADIUS * 2)
@@ -153,13 +128,11 @@ class BirdProjectileModel(GameObject):
         self.active = True
 
     def update(self, wind: float = 0.0) -> None:
-        """Двигаться вниз."""
+
         if self.active:
             self.move(wind, self.speed_y)
 
-
 class BirdModel(GameObject):
-    """Птица-враг, летящая горизонтально и стреляющая в игрока."""
 
     def __init__(self):
         y = random.randint(5, 60)
@@ -171,7 +144,7 @@ class BirdModel(GameObject):
         self.shoot_timer = random.randint(60, 150)
 
     def update(self, wind: float = 0.0) -> None:
-        """Двигаться горизонтально; деактивироваться за пределами экрана."""
+
         if not self.active:
             return
         self.move(self.speed_x + wind, 0)
@@ -179,9 +152,7 @@ class BirdModel(GameObject):
         if self.x < -BIRD_WIDTH * 2 or self.x > WIDTH + BIRD_WIDTH * 2:
             self.active = False
 
-
 class HawkStoneModel(GameObject):
-    """Большой камень, сброшенный боссом-ястребом."""
 
     def __init__(self, x: float, y: float):
         super().__init__(x, y, HAWK_STONE_RADIUS * 2, HAWK_STONE_RADIUS * 2)
@@ -189,13 +160,11 @@ class HawkStoneModel(GameObject):
         self.active = True
 
     def update(self, wind: float = 0.0) -> None:
-        """Двигаться вниз."""
+
         if self.active:
             self.move(wind, self.speed_y)
 
-
 class HawkBossModel(GameObject):
-    """Босс-ястреб с очками здоровья и атакой камнями."""
 
     def __init__(self):
         super().__init__(WIDTH // 2 - HAWK_WIDTH // 2, 5, HAWK_WIDTH, HAWK_HEIGHT)
@@ -206,7 +175,7 @@ class HawkBossModel(GameObject):
         self.hit_cooldown = 0
 
     def update(self, wind: float = 0.0) -> None:
-        """Двигаться горизонтально, управлять таймерами стрельбы и неуязвимости."""
+
         if not self.active:
             return
         self.move(self.speed_x, 0)
@@ -216,24 +185,13 @@ class HawkBossModel(GameObject):
         if self.hit_cooldown > 0:
             self.hit_cooldown -= 1
 
-
-# =============================================================================
-# Подсистема: очки (SRP — только работа с файлами счёта)
-# =============================================================================
-
 class ScoreManager:
-    """
-    Отвечает исключительно за сохранение и загрузку рекорда и последнего счёта.
-
-    Принцип единственной ответственности (SRP): вся файловая работа
-    с очками изолирована здесь и не засоряет GameState.
-    """
 
     _HIGH_SCORE_FILE = "save.txt"
     _LAST_SCORE_FILE = "last_score.txt"
 
     def load_high_score(self) -> int:
-        """Загрузить рекорд с диска. Возвращает 0 при ошибке."""
+
         try:
             with open(self._HIGH_SCORE_FILE, "r") as f:
                 return int(f.read())
@@ -241,7 +199,7 @@ class ScoreManager:
             return 0
 
     def save_high_score(self, score: int, current_high: int) -> int:
-        """Сохранить рекорд, если score превышает текущий. Возвращает новый рекорд."""
+
         if score > current_high:
             try:
                 with open(self._HIGH_SCORE_FILE, "w") as f:
@@ -252,7 +210,7 @@ class ScoreManager:
         return current_high
 
     def load_last_score(self) -> int:
-        """Загрузить последний счёт с диска. Возвращает 0 при ошибке."""
+
         try:
             with open(self._LAST_SCORE_FILE, "r") as f:
                 return int(f.read())
@@ -260,28 +218,17 @@ class ScoreManager:
             return 0
 
     def save_last_score(self, score: int) -> None:
-        """Сохранить текущий счёт как последний результат."""
+
         try:
             with open(self._LAST_SCORE_FILE, "w") as f:
                 f.write(str(score))
         except Exception as e:
             print(f"Ошибка сохранения счёта: {e}")
 
-
-# =============================================================================
-# Подсистема: уровни (SRP — только конфигурация уровней)
-# =============================================================================
-
 class LevelManager:
-    """
-    Отвечает исключительно за настройку и инициализацию каждого уровня.
-
-    Принцип единственной ответственности (SRP): логика уровней отделена
-    от хранения состояния игры.
-    """
 
     def load_level(self, level: int, state: "GameState") -> None:
-        """Настроить состояние игры для указанного уровня."""
+
         state.level = level
         state.animals = []
         state.lightnings = []
@@ -302,7 +249,7 @@ class LevelManager:
         self._spawn_animals(level, state)
 
     def _configure_environment(self, level: int, state: "GameState") -> None:
-        """Настроить облака, ветер и босса для данного уровня."""
+
         if level == 1:
             state.wind_cooldown = -1
             state.clouds = []
@@ -324,7 +271,7 @@ class LevelManager:
             state.clouds = [CloudModel() for _ in range(min(2 + level, 5))]
 
     def _spawn_animals(self, level: int, state: "GameState") -> None:
-        """Заполнить сетку зверьков для уровней без босса."""
+
         if level in (4, 7):
             return
         speed = (BASE_ANIMAL_SPEED + ANIMAL_SPEED_INCREMENT) if level == 3 \
@@ -338,21 +285,10 @@ class LevelManager:
                 y = ANIMAL_START_Y + row * ANIMAL_ROW_SPACING
                 state.animals.append(AnimalModel(x, y, speed, is_golden))
 
-
-# =============================================================================
-# Подсистема: коллизии (SRP — только обнаружение столкновений)
-# =============================================================================
-
 class CollisionHandler:
-    """
-    Отвечает исключительно за обнаружение и обработку коллизий.
-
-    Принцип единственной ответственности (SRP): вся логика столкновений
-    изолирована здесь и не загромождает GameState.
-    """
 
     def check(self, state: "GameState") -> None:
-        """Выполнить все проверки коллизий за текущий кадр."""
+
         self._check_ball_missed(state)
         self._check_ball_vs_player(state)
         self._check_ball_vs_birds(state)
@@ -364,25 +300,16 @@ class CollisionHandler:
         self._check_animals(state)
         self._check_level_completion(state)
 
-    # ── Вспомогательный метод (DRY) ──────────────────────────────────────────
-
     def _hit_player(self, player: PlayerModel, projectile, state: "GameState") -> None:
-        """
-        Нанести урон игроку: снять жизнь, деактивировать снаряд,
-        вызвать Game Over при исчерпании жизней.
 
-        Устраняет дублирование (DRY): этот паттерн использовался 4 раза.
-        """
         player.lives -= 1
         projectile.active = False
         if player.lives <= 0:
             state.state = "GAME_OVER"
             state.save_game_results()
 
-    # ── Частные методы проверок ───────────────────────────────────────────────
-
     def _check_ball_missed(self, state: "GameState") -> None:
-        """Снять жизнь, если все мячи упали за экран."""
+
         if not any(b.active for b in state.balls):
             state.player.lives -= 1
             state.player.combo_count = 0
@@ -395,7 +322,7 @@ class CollisionHandler:
                     b.reset()
 
     def _check_ball_vs_player(self, state: "GameState") -> None:
-        """Отразить мячи, попавшие в платформу игрока."""
+
         p = state.player
         for b in state.balls:
             if not b.active:
@@ -409,7 +336,7 @@ class CollisionHandler:
                 b.active = False
 
     def _check_ball_vs_birds(self, state: "GameState") -> None:
-        """Уничтожить птицу при попадании мяча."""
+
         for b in state.balls:
             if not b.active:
                 continue
@@ -423,7 +350,7 @@ class CollisionHandler:
                         state.player.score += 30
 
     def _check_ball_vs_hawk(self, state: "GameState") -> None:
-        """Нанести урон боссу-ястребу при попадании мяча."""
+
         if not (state.hawk_boss and state.hawk_boss.active):
             return
         hb = state.hawk_boss
@@ -442,7 +369,7 @@ class CollisionHandler:
                         state.player.score += 500
 
     def _check_cloud_shooting(self, state: "GameState") -> None:
-        """Создать молнию, если таймер облака истёк."""
+
         for cloud in state.clouds:
             if cloud.shoot_timer <= 0:
                 state.lightnings.append(
@@ -451,7 +378,7 @@ class CollisionHandler:
                 cloud.shoot_timer = random.randint(100, 300)
 
     def _check_lightning_vs_player(self, state: "GameState") -> None:
-        """Поразить игрока молнией и убрать вышедшие за экран."""
+
         p = state.player
         for lightning in state.lightnings:
             if lightning.active:
@@ -465,7 +392,7 @@ class CollisionHandler:
         state.lightnings = [l for l in state.lightnings if l.active]
 
     def _check_bird_projectiles_vs_player(self, state: "GameState") -> None:
-        """Поразить игрока камнем птицы и убрать вышедшие за экран."""
+
         p = state.player
         for proj in state.bird_projectiles:
             if proj.active:
@@ -479,7 +406,7 @@ class CollisionHandler:
         state.bird_projectiles = [pr for pr in state.bird_projectiles if pr.active]
 
     def _check_hawk_stones_vs_player(self, state: "GameState") -> None:
-        """Поразить игрока камнем босса и убрать вышедшие за экран."""
+
         p = state.player
         for stone in state.hawk_stones:
             if stone.active:
@@ -493,7 +420,7 @@ class CollisionHandler:
         state.hawk_stones = [s for s in state.hawk_stones if s.active]
 
     def _check_animals(self, state: "GameState") -> None:
-        """Обработать коллизии мяча со зверьками и зверьков с платформой."""
+
         p = state.player
         for animal in state.animals:
             if animal.caught or animal.lost:
@@ -522,7 +449,7 @@ class CollisionHandler:
                     p.score = max(0, p.score - 15)
 
     def _check_level_completion(self, state: "GameState") -> None:
-        """Перейти на следующий уровень при выполнении условия победы."""
+
         if state.state != "PLAYING":
             return
         if state.level in (4, 7):
@@ -532,28 +459,14 @@ class CollisionHandler:
         if complete:
             state.level_manager.load_level(state.level + 1, state)
 
-
-# =============================================================================
-# Главный класс состояния игры
-# =============================================================================
-
 class GameState:
-    """
-    Хранит текущее состояние игры и координирует подсистемы.
-
-    Делегирует ответственности:
-      - ScoreManager    — работа с файлами очков
-      - LevelManager    — загрузка и конфигурация уровней
-      - CollisionHandler — обнаружение коллизий
-    """
 
     def __init__(self):
-        # Подсистемы
+
         self.score_manager = ScoreManager()
         self.level_manager = LevelManager()
         self._collision_handler = CollisionHandler()
 
-        # Сущности
         self.player = PlayerModel()
         self.balls = [BallModel()]
         self.animals = []
@@ -564,7 +477,6 @@ class GameState:
         self.hawk_boss = None
         self.hawk_stones = []
 
-        # Игровые переменные
         self.level = 1
         self.combo_timer = 0
         self.wind_speed = 0.0
@@ -574,20 +486,19 @@ class GameState:
         self.state = "MENU"
         self.paused = False
 
-        # Очки
         self.high_score = self.score_manager.load_high_score()
         self.last_score = self.score_manager.load_last_score()
 
         self.level_manager.load_level(1, self)
 
     def save_game_results(self) -> None:
-        """Сохранить результаты текущей игры на диск."""
+
         self.last_score = self.player.score
         self.score_manager.save_last_score(self.last_score)
         self.high_score = self.score_manager.save_high_score(self.player.score, self.high_score)
 
     def update(self) -> None:
-        """Обновить состояние всех игровых объектов за один кадр."""
+
         if self.state != "PLAYING" or self.paused:
             return
 
@@ -622,7 +533,7 @@ class GameState:
         self._collision_handler.check(self)
 
     def _update_wind(self) -> None:
-        """Обновить скорость и таймеры ветра."""
+
         if self.wind_timer > 0:
             self.wind_timer -= 1
             if self.wind_timer <= 0:
@@ -636,7 +547,7 @@ class GameState:
             self.wind_timer = random.randint(120, 240)
 
     def _update_birds(self) -> None:
-        """Обновить птиц и их снаряды; управлять спавном."""
+
         spawn = (self.level == 3) or (self.level not in (1, 2, 4, 7))
         if spawn:
             self.bird_spawn_timer -= 1
@@ -656,3 +567,4 @@ class GameState:
 
         for proj in self.bird_projectiles:
             proj.update(self.wind_speed)
+

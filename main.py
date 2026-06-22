@@ -1,10 +1,3 @@
-"""
-main.py — Точка входа в игру «Пушистый переполох».
-
-Инициализирует pygame, создаёт экземпляры Model, View и Controller,
-запускает основной игровой цикл и корректно завершает приложение.
-"""
-
 import pygame
 from constants import WIDTH, HEIGHT, FPS
 from models import GameState
